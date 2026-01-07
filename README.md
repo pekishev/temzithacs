@@ -1,4 +1,4 @@
-# Temzit heat pumps integration for Home Assistant (Тепловые насосы темзит)
+# Temzit heat pump for Home Assistant (Тепловые насосы темзит)
 
 [![GitHub Release][releases-shield]][releases]
 [![GitHub Activity][commits-shield]][commits]
@@ -8,41 +8,121 @@
 
 [![Community Forum][forum-shield]][forum]
 
-_Integration to integrate with [integration_blueprint][integration_blueprint]._
+_Интеграция для управления тепловыми насосами Temzit в Home Assistant._
 
-**This integration will set up the following platforms.**
+**Эта интеграция создает следующие платформы:**
 
-Platform | Description
--- | --
-`sensor` | Show info from blueprint API.
-`switch` | Switch something `True` or `False`.
+| Platform | Description |
+| -- | -- |
+| `sensor` | Сенсоры температуры, мощности, протока, COP и другие параметры |
+| `climate` | Управление отоплением дома с установкой целевой температуры |
+| `water_heater` | Управление горячей водой с установкой целевой температуры |
 
-## Manual Installation
+## Возможности
 
-1. Using the tool of choice open the directory (folder) for your HA configuration (where you find `configuration.yaml`).
-1. If you do not have a `custom_components` directory (folder) there, you need to create it.
-1. In the `custom_components` directory (folder) create a new folder called `integration_blueprint`.
-1. Download _all_ the files from the `custom_components/integration_blueprint/` directory (folder) in this repository.
-1. Place the files you downloaded in the new directory (folder) you created.
-1. Restart Home Assistant
-1. In the HA UI go to "Configuration" -> "Integrations" click "+" and search for "Integration blueprint"
+- ✅ Мониторинг всех параметров теплового насоса
+- ✅ Управление температурой отопления (0-50°C)
+- ✅ Управление температурой ГВС (0-60°C)
+- ✅ Автоматическое обновление данных каждые 30 секунд
+- ✅ Поддержка локального протокола (без облака)
+- ✅ Полная совместимость с Home Assistant 2024.1+
 
-## Installation via HACS (recommended)
+## Установка через HACS (рекомендуется)
 
-1. Go to HACS->Integrations.
-1. Three dots->User repositories.
-1. Paste https://github.com/pekishev/temzithacs with category `Integration`, click add.
-1. Reboot Home Assistant
-1. Then add new integration via HACS->Add->search `temzit`
-1. Insert temzit ip address in local network
+1. Убедитесь, что [HACS](https://hacs.xyz/) установлен в вашей системе Home Assistant
+2. Перейдите в **HACS** → **Integrations**
+3. Нажмите на три точки (⋮) в правом верхнем углу
+4. Выберите **Custom repositories**
+5. Добавьте репозиторий:
+   - **Repository**: `https://github.com/pekishev/temzithacs`
+   - **Category**: `Integration`
+6. Нажмите **Add**
+7. Перезагрузите Home Assistant
+8. Перейдите в **HACS** → **Integrations**
+9. Найдите "Temzit heat pump" и нажмите **Download**
+10. Перезагрузите Home Assistant еще раз
 
-## Configuration is done in the UI
+## Ручная установка
 
-<!---->
+1. Откройте директорию конфигурации Home Assistant (где находится `configuration.yaml`)
+2. Если нет папки `custom_components`, создайте её
+3. В папке `custom_components` создайте новую папку `temzit`
+4. Скачайте все файлы из папки `custom_components/temzit/` этого репозитория
+5. Поместите скачанные файлы в созданную папку
+6. Перезагрузите Home Assistant
+7. В интерфейсе HA перейдите в **Настройки** → **Устройства и службы**, нажмите **+** и найдите "Temzit heat pump"
 
-## Contributions are welcome!
+## Настройка
 
-If you want to contribute to this please read the [Contribution guidelines](CONTRIBUTING.md)
+Настройка выполняется через UI:
+
+1. Перейдите в **Настройки** → **Устройства и службы**
+2. Нажмите **Добавить интеграцию** (кнопка в правом нижнем углу)
+3. Найдите "Temzit heat pump"
+4. Введите IP-адрес вашего теплового насоса в локальной сети
+5. Нажмите **Отправить**
+
+## Создаваемые сущности
+
+### Сенсоры
+
+- **Температура в доме** - текущая температура внутри помещения
+- **Температура на улице** - температура наружного воздуха
+- **Температура ГВС** - температура горячей воды
+- **Подача** - температура подачи теплоносителя
+- **Обратка** - температура обратки теплоносителя
+- **Потребление** - потребляемая электрическая мощность (кВт)
+- **Мощность нагрева** - выходная тепловая мощность (кВт)
+- **COP** - коэффициент производительности (отношение мощности нагрева к потреблению)
+- **Проток** - скорость потока теплоносителя (л/мин)
+- **Компрессор 1** - частота работы компрессора (Гц)
+- **Ошибка** - код ошибки устройства
+
+### Климат
+
+- **Обогрев дома** - управление системой отопления с возможностью установки целевой температуры
+
+### Водонагреватели
+
+- **Горячая вода** - управление системой ГВС с возможностью установки целевой температуры
+
+## Управление
+
+Интеграция поддерживает управление через интерфейс Home Assistant:
+
+- **Установка температуры отопления**: через климат-устройство "Обогрев дома"
+- **Установка температуры ГВС**: через водонагреватель "Горячая вода"
+
+Все изменения применяются безопасно - интеграция получает текущие настройки устройства, изменяет только нужный параметр и отправляет все настройки обратно, сохраняя остальные параметры.
+
+## Технические детали
+
+- **Версия интеграции**: 2024.1.1
+- **Минимальная версия Home Assistant**: 2024.1.0
+- **Протокол**: TCP на порту 333
+- **Класс IoT**: local_polling (локальное опрашивание)
+- **Интервал обновления**: 30 секунд
+- **Протокол устройства**: [HM_Protocol.pdf](https://temzit.ru/downloads/HM_Protocol.pdf)
+
+## Отладка
+
+Если возникли проблемы:
+
+1. Проверьте логи Home Assistant: **Настройки** → **Система** → **Журналы**
+2. Убедитесь, что IP-адрес правильный и устройство доступно в сети
+3. Проверьте доступность порта 333:
+   ```bash
+   telnet <IP-адрес> 333
+   ```
+4. Создайте issue в [репозитории GitHub](https://github.com/pekishev/temzithacs/issues) с описанием проблемы и логами
+
+## Вклад в проект
+
+Вклад в проект приветствуется! Пожалуйста, прочитайте [руководство по участию](CONTRIBUTING.md) перед отправкой изменений.
+
+## Лицензия
+
+Этот проект распространяется под лицензией MIT. См. файл [LICENSE](LICENSE) для подробностей.
 
 ***
 

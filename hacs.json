@@ -1,8 +1,6 @@
 {
-    "name": "Temzit heat pump integration",
-    "filename": "intetemzit.zip",
+    "name": "Temzit heat pump",
     "hide_default_branch": true,
-    "homeassistant": "2023.8.0",
-    "render_readme": true,
-    "zip_release": true
+    "homeassistant": "2024.1.0",
+    "render_readme": true
 }
