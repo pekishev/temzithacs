@@ -31,7 +31,7 @@ Platform | Description
 
 1. Go to HACS->Integrations.
 1. Three dots->User repositories.
-1. Paste https://github.com/fireya/temzit with category `Integration`, click add.
+1. Paste https://github.com/pekishev/temzithacs with category `Integration`, click add.
 1. Reboot Home Assistant
 1. Then add new integration via HACS->Add->search `temzit`
 1. Insert temzit ip address in local network
@@ -46,13 +46,13 @@ If you want to contribute to this please read the [Contribution guidelines](CONT
 
 ***
 
-[integration_blueprint]: https://github.com/fireya/temzit
+[integration_blueprint]: https://github.com/pekishev/temzithacs
 [buymecoffeebadge]: https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg?style=for-the-badge
-[commits-shield]: https://img.shields.io/github/commit-activity/y/fireya/temzit.svg?style=for-the-badge
-[commits]: https://github.com/fireya/temzit/commits/main
+[commits-shield]: https://img.shields.io/github/commit-activity/y/pekishev/temzithacs.svg?style=for-the-badge
+[commits]: https://github.com/pekishev/temzithacs/commits/main
 [exampleimg]: example.png
 [forum-shield]: https://img.shields.io/badge/community-forum-brightgreen.svg?style=for-the-badge
 [forum]: https://community.home-assistant.io/
-[license-shield]: https://img.shields.io/github/license/fireya/temzit.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/fireya/temzit.svg?style=for-the-badge
-[releases]: https://github.com/fireya/temzit/releases
+[license-shield]: https://img.shields.io/github/license/pekishev/temzithacs.svg?style=for-the-badge
+[releases-shield]: https://img.shields.io/github/release/pekishev/temzithacs.svg?style=for-the-badge
+[releases]: https://github.com/pekishev/temzithacs/releases

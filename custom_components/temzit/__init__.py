@@ -1,7 +1,7 @@
 """Custom integration to integrate temzit with Home Assistant.
 
 For more details about this integration, please refer to
-https://github.com/fireya/temzit
+https://github.com/pekishev/temzithacs
 """
 from __future__ import annotations
 
