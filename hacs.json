@@ -1,6 +1,5 @@
 {
     "name": "Temzit heat pump",
-    "hide_default_branch": true,
     "homeassistant": "2024.1.0",
     "render_readme": true
 }
