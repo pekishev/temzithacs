@@ -1,8 +1,8 @@
-"""DataUpdateCoordinator for integration_blueprint."""
+"""DataUpdateCoordinator for Temzit integration."""
 from __future__ import annotations
 
 from datetime import timedelta
-import async_timeout
+import asyncio
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -45,7 +45,7 @@ class TemzitUpdateCoordinator(DataUpdateCoordinator):
         try:
             # Note: asyncio.TimeoutError and aiohttp.ClientError are already
             # handled by the data update coordinator.
-            async with async_timeout.timeout(10):
+            async with asyncio.timeout(10):
                 # Grab active context variables to limit data required to be fetched from API
                 # Note: using context is not required if there is no need or ability to limit
                 # data retrieved from API.

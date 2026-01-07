@@ -6,4 +6,4 @@ LOGGER: Logger = getLogger(__package__)
 NAME = "Temzit heat pump integration"
 DOMAIN = "temzit"
 VERSION = "2024.1.1"
-ATTRIBUTION = "Data provided by http://jsonplaceholder.typicode.com/"
+ATTRIBUTION = "Data provided by Temzit heat pump"
