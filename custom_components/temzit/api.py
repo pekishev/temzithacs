@@ -122,62 +122,106 @@ class TemzitApiClient:
                 except Exception:
                     pass
 
-    async def _send_settings(self, settings: "temzit_settings") -> None:
-        """Send settings to the heat pump.
+    async def _send_settings(self, settings: "temzit_settings", max_retries: int = 3, retry_delay: float = 2.0) -> None:
+        """Send settings to the heat pump with retry mechanism.
         
         Protocol: Send command 0x35 0x3E (62 bytes of settings data)
         Based on protocol documentation at https://temzit.ru/downloads/HM_Protocol.pdf
+        
+        Args:
+            settings: Settings object to send
+            max_retries: Maximum number of retry attempts (default: 3)
+            retry_delay: Delay between retries in seconds (default: 2.0)
         """
-        reader = None
-        writer = None
-        try:
-            _LOGGER.debug("Connecting to %s:%s to send settings", self.ip, self.port)
-            reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(host=self.ip, port=self.port),
-                timeout=5.0
-            )
-            
-            settings_bytes = settings.to_bytes()
-            _LOGGER.debug("Sending settings command (%d bytes): %s", len(settings_bytes), settings_bytes[:10].hex() + "...")
-            writer.write(settings_bytes)
-            await writer.drain()
-            
-            # Wait for acknowledgment (device should respond)
-            response = await asyncio.wait_for(reader.read(64), timeout=5.0)
-            _LOGGER.debug("Received response (%d bytes): %s", len(response), response.hex()[:20] if response else "empty")
-            
-            if len(response) == 0:
-                _LOGGER.warning("No response from device, but settings may have been applied")
-                # Don't raise error - device might not send response
+        last_exception = None
+        
+        for attempt in range(1, max_retries + 1):
+            reader = None
+            writer = None
+            try:
+                _LOGGER.debug("Attempt %d/%d: Connecting to %s:%s to send settings", attempt, max_retries, self.ip, self.port)
+                reader, writer = await asyncio.wait_for(
+                    asyncio.open_connection(host=self.ip, port=self.port),
+                    timeout=5.0
+                )
+                
+                settings_bytes = settings.to_bytes()
+                _LOGGER.debug("Sending settings command (%d bytes): %s", len(settings_bytes), settings_bytes[:10].hex() + "...")
+                writer.write(settings_bytes)
+                await writer.drain()
+                
+                # Wait for acknowledgment (device should respond)
+                response = await asyncio.wait_for(reader.read(64), timeout=5.0)
+                _LOGGER.debug("Received response (%d bytes): %s", len(response), response.hex()[:20] if response else "empty")
+                
+                if len(response) == 0:
+                    _LOGGER.warning("No response from device, but settings may have been applied")
+                    # Don't raise error - device might not send response
+                    return
+                
+                # Check if command was acknowledged
+                # Response format may vary, log for debugging
+                if len(response) >= 1:
+                    _LOGGER.debug("Response command byte: 0x%02X", response[0])
+                
+                # Success - return
+                _LOGGER.info("Settings successfully sent to %s:%s (attempt %d/%d)", self.ip, self.port, attempt, max_retries)
                 return
-            
-            # Check if command was acknowledged
-            # Response format may vary, log for debugging
-            if len(response) >= 1:
-                _LOGGER.debug("Response command byte: 0x%02X", response[0])
-            
-        except (ConnectionError, OSError) as exception:
-            _LOGGER.error("Connection error sending settings to %s:%s: %s", self.ip, self.port, exception)
+                
+            except (ConnectionError, OSError) as exception:
+                last_exception = exception
+                _LOGGER.warning("Connection error sending settings to %s:%s (attempt %d/%d): %s", 
+                              self.ip, self.port, attempt, max_retries, exception)
+                if attempt < max_retries:
+                    _LOGGER.info("Retrying in %.1f seconds...", retry_delay)
+                    await asyncio.sleep(retry_delay)
+                    continue
+                else:
+                    _LOGGER.error("Failed to send settings after %d attempts", max_retries)
+                    raise TemzitApiClientCommunicationError(
+                        f"Error connecting to {self.ip}:{self.port} after {max_retries} attempts: {exception}"
+                    ) from exception
+                    
+            except asyncio.TimeoutError as exception:
+                last_exception = exception
+                _LOGGER.warning("Timeout sending settings to %s:%s (attempt %d/%d)", 
+                              self.ip, self.port, attempt, max_retries)
+                if attempt < max_retries:
+                    _LOGGER.info("Retrying in %.1f seconds...", retry_delay)
+                    await asyncio.sleep(retry_delay)
+                    continue
+                else:
+                    _LOGGER.error("Timeout sending settings after %d attempts", max_retries)
+                    raise TemzitApiClientCommunicationError(
+                        f"Timeout sending settings to {self.ip}:{self.port} after {max_retries} attempts"
+                    ) from exception
+                    
+            except Exception as exception:
+                last_exception = exception
+                _LOGGER.warning("Unexpected error sending settings (attempt %d/%d): %s", attempt, max_retries, exception)
+                if attempt < max_retries:
+                    _LOGGER.info("Retrying in %.1f seconds...", retry_delay)
+                    await asyncio.sleep(retry_delay)
+                    continue
+                else:
+                    _LOGGER.exception("Failed to send settings after %d attempts", max_retries)
+                    raise TemzitApiClientCommunicationError(
+                        f"Unexpected error after {max_retries} attempts: {exception}"
+                    ) from exception
+                    
+            finally:
+                if writer:
+                    writer.close()
+                    try:
+                        await writer.wait_closed()
+                    except Exception:
+                        pass
+        
+        # Should not reach here, but just in case
+        if last_exception:
             raise TemzitApiClientCommunicationError(
-                f"Error connecting to {self.ip}:{self.port}: {exception}"
-            ) from exception
-        except asyncio.TimeoutError as exception:
-            _LOGGER.error("Timeout sending settings to %s:%s", self.ip, self.port)
-            raise TemzitApiClientCommunicationError(
-                f"Timeout sending settings to {self.ip}:{self.port}"
-            ) from exception
-        except Exception as exception:
-            _LOGGER.exception("Unexpected error sending settings: %s", exception)
-            raise TemzitApiClientCommunicationError(
-                f"Unexpected error: {exception}"
-            ) from exception
-        finally:
-            if writer:
-                writer.close()
-                try:
-                    await writer.wait_closed()
-                except Exception:
-                    pass
+                f"Failed to send settings after {max_retries} attempts"
+            ) from last_exception
 
     async def set_target_temperature(self, temperature: float) -> None:
         """Set target temperature for heating (0-50°C).
