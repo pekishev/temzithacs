@@ -61,8 +61,13 @@ class HotWaterHeater(TemzitEntity, WaterHeaterEntity):
         self._attr_current_operation = STATE_ELECTRIC if self.coordinator.data.boiler_heater_is_on else STATE_OFF
         self.async_write_ha_state()
 
-    async def async_set_temperature(self, temperature: float) -> None:
-        """Set new target temperature."""
+    async def async_set_temperature(self, temperature: float, **kwargs) -> None:
+        """Set new target temperature.
+        
+        Args:
+            temperature: Target temperature to set
+            **kwargs: Additional arguments (entity_id, etc.) - ignored
+        """
         try:
             await self.coordinator.client.set_target_hotwater_temperature(temperature)
             # Request coordinator update to get new state
@@ -96,8 +101,13 @@ class MainHeater(TemzitEntity, WaterHeaterEntity):
         self._attr_current_operation = STATE_PERFORMANCE if self.coordinator.data.main_heater_is_on else STATE_HEAT_PUMP
         self.async_write_ha_state()
 
-    async def async_set_temperature(self, temperature: float) -> None:
-        """Set new target temperature."""
+    async def async_set_temperature(self, temperature: float, **kwargs) -> None:
+        """Set new target temperature.
+        
+        Args:
+            temperature: Target temperature to set
+            **kwargs: Additional arguments (entity_id, etc.) - ignored
+        """
         try:
             await self.coordinator.client.set_target_temperature(temperature)
             # Request coordinator update to get new state
