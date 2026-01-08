@@ -75,10 +75,37 @@ class TemzitClimate(TemzitEntity, ClimateEntity):
             _LOGGER.error("Error setting temperature: %s", err)
             raise
 
-    async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
-        """Set new target hvac mode."""
+    async def async_set_hvac_mode(self, hvac_mode: HVACMode | str) -> None:
+        """Set new target hvac mode.
+        
+        Args:
+            hvac_mode: HVAC mode as HVACMode enum or string ('off', 'heat', etc.)
+        """
+        # Validate and normalize hvac_mode
+        if hvac_mode is None:
+            _LOGGER.error("HVAC mode is None, cannot set")
+            raise ValueError("HVAC mode cannot be None")
+        
+        # Convert string to HVACMode if needed
+        if isinstance(hvac_mode, str):
+            hvac_mode_str = hvac_mode.lower()
+            if hvac_mode_str == "off":
+                hvac_mode = HVACMode.OFF
+            elif hvac_mode_str == "heat":
+                hvac_mode = HVACMode.HEAT
+            else:
+                _LOGGER.error("Unsupported HVAC mode string: %s", hvac_mode)
+                raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
+        
+        # Validate that mode is in supported modes
+        if hvac_mode not in self._attr_hvac_modes:
+            _LOGGER.error("HVAC mode %s is not in supported modes: %s", hvac_mode, self._attr_hvac_modes)
+            raise ValueError(f"HVAC mode {hvac_mode} is not supported. Supported modes: {self._attr_hvac_modes}")
+        
         try:
+            # Convert HVACMode to API string
             mode_str = "on" if hvac_mode == HVACMode.HEAT else "off"
+            _LOGGER.debug("Setting HVAC mode: %s -> %s", hvac_mode, mode_str)
             await self.coordinator.client.set_hvac_mode(mode_str)
             # Request coordinator update to get new state
             await self.coordinator.async_request_refresh()
