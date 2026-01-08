@@ -129,9 +129,11 @@ class TemzitApiClient:
     async def _send_settings(self, settings: "temzit_settings", max_retries: int = 3, retry_delay: float = 2.0) -> None:
         """Send settings to the heat pump with retry mechanism.
         
-        Protocol CFG 0x35: Send command 0x35 + 30 bytes settings + 1 byte checksum = 32 bytes total
-        In response, device sends ACTUAL_STATE (0x01) packet
-        Based on protocol documentation at https://temzit.ru/downloads/HM_Protocol.pdf
+        Based on Java SimpleClient.sendPacket() implementation:
+        - Command: 0x35 (SEND_SETTINGS)
+        - Format: 0x35 + 0x1A (26) + 26 bytes data + 4 zero bytes + 1 byte checksum = 32 bytes total
+        - Checksum: sum of bytes 0-30, written to byte 31
+        - In response, device sends ACTUAL_STATE (0x01) packet
         
         Args:
             settings: Settings object to send
@@ -337,19 +339,50 @@ class temzit_state:
 
     @property
     def consumption(self) -> float:
+        """Power consumption in W (Pin).
+        
+        Java: Pin = getWord(bArr, 30) / 10.0f
+        Since we do data[2:], offset 30 in full packet = offset 28 in self.data
+        """
+        # Java: Pin = getWord(bArr, 30) / 10.0f
+        # bArr[30,31] in full packet = data[28,29] after data[2:]
         return self.convert(28, 30) / 10
 
     @property
     def target_indoor_temp(self) -> float:
-        return self.convert(49, 50)
+        """Target indoor temperature (TroomSet) from ACTUAL_STATE packet.
+        
+        Java: TroomSet = bArr[51] & 255
+        Since we do data[2:], offset 51 in full packet = offset 49 in self.data
+        """
+        # bArr[51] in full packet = data[49] after data[2:]
+        if len(self.data) > 49:
+            return float(self.data[49])
+        return 0.0
 
     @property
     def target_water_temp(self) -> float:
-        return self.convert(50, 51)
+        """Target water temperature (TwaterSet) from ACTUAL_STATE packet.
+        
+        Java: TwaterSet = bArr[52] & 255
+        Since we do data[2:], offset 52 in full packet = offset 50 in self.data
+        """
+        # bArr[52] in full packet = data[50] after data[2:]
+        if len(self.data) > 50:
+            return float(self.data[50])
+        return 0.0
 
     @property
     def target_hotwater_temp(self) -> float:
-        return self.convert(51, 52)
+        """Target hot water temperature (TgvsSet) from ACTUAL_STATE packet.
+        
+        Java: TgvsSet = bArr[53] & 255
+        Since we do data[2:], offset 53 in full packet = offset 51 in self.data
+        """
+        # bArr[53] in full packet = data[51] after data[2:]
+        if len(self.data) > 51:
+            return float(self.data[51])
+        return 0.0
 
     @property
     def heat_power(self) -> float:
@@ -361,25 +394,63 @@ class temzit_state:
 
     @property
     def flow(self) -> float:
-        """Liquid speed in L/min (from C#: LiquidSpeed = BitConverter.ToInt16(data, 18) * 4.2f)."""
-        return self.convert(18, 20) * 4.2
+        """Liquid speed in L/min.
+        
+        Java: Flow = getWord(bArr, 20) & 255
+        Since we do data[2:], offset 20 in full packet = offset 18 in self.data
+        Java takes only low byte, so we need to extract byte 18 (not 16-bit word)
+        Then multiply by 4.2 (from C# implementation)
+        """
+        # Java: Flow = getWord(bArr, 20) & 255 - takes only low byte
+        # bArr[20] in full packet = data[18] after data[2:]
+        if len(self.data) > 18:
+            flow_raw = self.data[18] & 0xFF
+            return flow_raw * 4.2
+        return 0.0
 
     @property
     def error(self) -> int:
-        """Error code (from C#: Error = BitConverter.ToInt16(data, 30))."""
+        """Error code (Failures).
+        
+        Java: Failures = getWord(bArr, 32)
+        Since we do data[2:], offset 32 in full packet = offset 30 in self.data
+        """
+        # Java: Failures = getWord(bArr, 32)
+        # bArr[32,33] in full packet = data[30,31] after data[2:]
         return self.convert(30, 32)
 
     @property
     def compressor1(self) -> int:
-        """Compressor 1 status (from C#: Compressor1 = data[22])."""
-        return self.data[22] if len(self.data) > 22 else 0
-
-    @property
-    def boiler_heater_is_on(self) -> bool:
-        return self.convert(26, 28) > 0
+        """Compressor 1 frequency in Hz.
+        
+        Java: CompFreq = getWord(bArr, 24) & 255
+        Since we do data[2:], offset 24 in full packet = offset 22 in self.data
+        Java takes only low byte from 16-bit word
+        """
+        # Java: CompFreq = getWord(bArr, 24) & 255 - takes only low byte
+        # bArr[24] in full packet = data[22] after data[2:]
+        if len(self.data) > 22:
+            return self.data[22] & 0xFF
+        return 0
 
     @property
     def main_heater_is_on(self) -> bool:
+        """Main heater (TEN) state.
+        
+        Protocol: Состояние ТЭНа at offset 24 (16-bit)
+        Since we do data[2:], offset 24 in full packet = offset 22 in self.data
+        """
+        # bArr[24,25] in full packet = data[22,23] after data[2:]
+        return self.convert(22, 24) > 0
+
+    @property
+    def boiler_heater_is_on(self) -> bool:
+        """Boiler heater state.
+        
+        Protocol: Состояние нагревателя в БКН at offset 26 (16-bit)
+        Since we do data[2:], offset 26 in full packet = offset 24 in self.data
+        """
+        # bArr[26,27] in full packet = data[24,25] after data[2:]
         return self.convert(24, 26) > 0
 
     @property
@@ -397,53 +468,72 @@ class temzit_settings:
     def __init__(self, data) -> None:
         # Store full response including command byte
         self.raw_data = data
-        # Settings data starts from byte 2 (skip command 0x02 and length/reserve)
         # CONFIG_MAIN response: 0x02 | settings 30 bytes | reserve 31 bytes | CS 2 bytes
-        # We need only first 30 bytes of settings
-        if len(data) > 2:
-            # Extract settings array (30 bytes starting from offset 1, after command 0x02)
-            self.data = bytearray(data[1:31])  # bytes 1-30 (settings array)
+        # Java unpackData: for SETTINGS (0x02), extracts bytes 2-31 (30 bytes) into config string
+        # Java sendPacket: for SEND_SETTINGS (0x35), uses only first 26 bytes from config
+        if len(data) > 32:
+            # Extract settings array: bytes 2-31 (30 bytes total)
+            # But we'll only use first 26 bytes for sending (as Java does)
+            full_settings = bytearray(data[2:32])  # bytes 2-31 (30 bytes)
+            self.data = bytearray(full_settings[0:26])  # Only first 26 bytes for sending
+        elif len(data) > 2:
+            # Fallback: if response is shorter, take what we can
+            available = min(26, len(data) - 2)
+            self.data = bytearray(data[2:2+available])
+            # Pad with zeros if needed
+            if len(self.data) < 26:
+                self.data.extend(bytearray(26 - len(self.data)))
         else:
-            self.data = bytearray(30)  # Default: 30 zero bytes
+            self.data = bytearray(26)  # Default: 26 zero bytes
 
     def convert(self, s: int, e: int) -> int:
         """Convert bytes to integer (for reading from response)."""
         return int.from_bytes(self.data[s:e], byteorder="little", signed=True)
     
     def set_byte(self, offset: int, value: int) -> None:
-        """Set a single byte at offset (0-29 for settings array)."""
-        if 0 <= offset < 30:
+        """Set a single byte at offset (0-25 for settings array).
+        
+        Based on Java implementation, settings array is 26 bytes.
+        """
+        if 0 <= offset < 26:
             self.data[offset] = value & 0xFF
         else:
-            raise ValueError(f"Offset {offset} out of range (0-29)")
+            raise ValueError(f"Offset {offset} out of range (0-25)")
     
     def set_short(self, offset: int, value: int) -> None:
         """Set a 16-bit signed integer at offset (little-endian)."""
-        if 0 <= offset < 29:  # Need 2 bytes, so max offset is 29
+        if 0 <= offset < 25:  # Need 2 bytes, so max offset is 25
             value_bytes = int.to_bytes(value, 2, byteorder="little", signed=True)
             self.data[offset:offset+2] = value_bytes
         else:
-            raise ValueError(f"Offset {offset} out of range (0-28 for 16-bit value)")
+            raise ValueError(f"Offset {offset} out of range (0-24 for 16-bit value)")
     
     def to_bytes(self) -> bytes:
-        """Convert settings to bytes for sending according to protocol.
+        """Convert settings to bytes for sending according to Java implementation.
         
-        Protocol CFG 0x35: 
-        - Command: 0x35 (1 byte)
-        - Settings array: 30 bytes
-        - Checksum: 1 byte (sum of all bytes including 0x35, modulo 256)
+        Java SimpleClient.sendPacket() for SEND_SETTINGS (0x35):
+        - bArr[0] = 0x35 (command)
+        - bArr[1] = 26 (data length)
+        - bArr[2..27] = settings data (26 bytes)
+        - bArr[28..30] = 0 (reserved, but not used in Java)
+        - bArr[31] = checksum (CalcCRC calculates sum of bytes 0-30, writes to 31)
         Total: 32 bytes
+        
+        CalcCRC: sum of bytes 0 to i-1, write to byte i
         """
-        # Build packet: 0x35 + 30 bytes of settings
-        packet = bytearray([0x35]) + self.data
+        # Build packet according to Java implementation
+        packet = bytearray(32)
+        packet[0] = 0x35  # Command SEND_SETTINGS
+        packet[1] = 26    # Data length
+        # Copy 26 bytes of settings data
+        packet[2:28] = self.data[0:26]
+        # Bytes 28-30 are zero (already initialized)
+        # Calculate checksum: sum of bytes 0-30, write to byte 31
+        checksum = sum(packet[0:31]) & 0xFF
+        packet[31] = checksum
         
-        # Calculate checksum: sum of all bytes including 0x35, modulo 256
-        checksum = sum(packet) & 0xFF
-        
-        # Append checksum
-        packet.append(checksum)
-        
-        _LOGGER.debug("Sending CFG packet: cmd=0x%02X, settings_len=%d, checksum=0x%02X", 
-                    0x35, len(self.data), checksum)
+        _LOGGER.debug("Sending CFG packet (Java format): cmd=0x%02X, len=0x%02X, data_len=%d, checksum=0x%02X", 
+                    0x35, 26, len(self.data), checksum)
+        _LOGGER.debug("Packet hex: %s", packet.hex())
         
         return bytes(packet)
