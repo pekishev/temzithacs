@@ -1,14 +1,5 @@
-# Temzit heat pump for Home Assistant (Тепловые насосы темзит)
-
-[![GitHub Release][releases-shield]][releases]
-[![GitHub Activity][commits-shield]][commits]
-[![License][license-shield]](LICENSE)
-
-![Project Maintenance][maintenance-shield]
-
-[![Community Forum][forum-shield]][forum]
-
-_Интеграция для управления тепловыми насосами Temzit в Home Assistant._
+# Temzit heat pump integration for Home Assistant
+_Интеграция для управления тепловыми насосами ТЭМЗИТ в Home Assistant._
 
 **Эта интеграция создает следующие платформы:**
 

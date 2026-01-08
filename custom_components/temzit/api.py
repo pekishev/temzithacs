@@ -98,8 +98,12 @@ class TemzitApiClient:
             if len(data) == 0:
                 raise TemzitApiClientCommunicationError("Empty response from device")
             
-            if len(data) < 2:
-                raise TemzitApiClientCommunicationError("Invalid response length")
+            if len(data) < 64:
+                raise TemzitApiClientCommunicationError(f"Invalid response length: {len(data)} (expected 64 for CONFIG_MAIN)")
+            
+            # Check response type: CONFIG_MAIN should be 0x02
+            if data[0] != 0x02:
+                _LOGGER.warning("Unexpected response command: 0x%02X (expected 0x02 CONFIG_MAIN)", data[0])
             
             return temzit_settings(data)
         except (ConnectionError, OSError) as exception:
@@ -125,7 +129,8 @@ class TemzitApiClient:
     async def _send_settings(self, settings: "temzit_settings", max_retries: int = 3, retry_delay: float = 2.0) -> None:
         """Send settings to the heat pump with retry mechanism.
         
-        Protocol: Send command 0x35 0x3E (62 bytes of settings data)
+        Protocol CFG 0x35: Send command 0x35 + 30 bytes settings + 1 byte checksum = 32 bytes total
+        In response, device sends ACTUAL_STATE (0x01) packet
         Based on protocol documentation at https://temzit.ru/downloads/HM_Protocol.pdf
         
         Args:
@@ -146,23 +151,28 @@ class TemzitApiClient:
                 )
                 
                 settings_bytes = settings.to_bytes()
-                _LOGGER.debug("Sending settings command (%d bytes): %s", len(settings_bytes), settings_bytes[:10].hex() + "...")
+                if len(settings_bytes) != 32:
+                    raise ValueError(f"Invalid settings packet length: {len(settings_bytes)} (expected 32)")
+                
+                _LOGGER.debug("Sending CFG command (%d bytes): %s", len(settings_bytes), settings_bytes.hex())
                 writer.write(settings_bytes)
                 await writer.drain()
                 
-                # Wait for acknowledgment (device should respond)
+                # Wait for ACTUAL_STATE response (device responds with 0x01 packet)
                 response = await asyncio.wait_for(reader.read(64), timeout=5.0)
                 _LOGGER.debug("Received response (%d bytes): %s", len(response), response.hex()[:20] if response else "empty")
                 
                 if len(response) == 0:
                     _LOGGER.warning("No response from device, but settings may have been applied")
-                    # Don't raise error - device might not send response
+                    # Don't raise error - device might not send response in some cases
                     return
                 
-                # Check if command was acknowledged
-                # Response format may vary, log for debugging
+                # Check if response is ACTUAL_STATE (0x01)
                 if len(response) >= 1:
-                    _LOGGER.debug("Response command byte: 0x%02X", response[0])
+                    if response[0] == 0x01:
+                        _LOGGER.debug("Received ACTUAL_STATE response (0x01) - settings accepted")
+                    else:
+                        _LOGGER.warning("Unexpected response command: 0x%02X (expected 0x01 ACTUAL_STATE)", response[0])
                 
                 # Success - return
                 _LOGGER.info("Settings successfully sent to %s:%s (attempt %d/%d)", self.ip, self.port, attempt, max_retries)
@@ -240,10 +250,8 @@ class TemzitApiClient:
         current_settings = await self.fetch_settings()
         
         # Modify target water temperature
-        # Note: Offset 50 is based on temzit_state.target_water_temp structure
-        # If protocol uses different offset for settings, adjust accordingly
-        # Settings structure may differ from state structure
-        current_settings.set_byte(50, temp_int)
+        # According to protocol: Тводы (target water temp) is at offset 2 in settings array
+        current_settings.set_byte(2, temp_int)
         
         _LOGGER.info("Setting target heating temperature to %d°C (preserving other settings)", temp_int)
         
@@ -267,9 +275,8 @@ class TemzitApiClient:
         current_settings = await self.fetch_settings()
         
         # Modify target hot water temperature
-        # Note: Offset 51 is based on temzit_state.target_hotwater_temp structure
-        # If protocol uses different offset for settings, adjust accordingly
-        current_settings.set_byte(51, temp_int)
+        # According to protocol: Тгвс (target hot water temp) is at offset 7 in settings array
+        current_settings.set_byte(7, temp_int)
         
         _LOGGER.info("Setting target hot water temperature to %d°C (preserving other settings)", temp_int)
         
@@ -285,10 +292,11 @@ class TemzitApiClient:
         # Fetch current settings
         current_settings = await self.fetch_settings()
         
-        # Modify state (byte 0 based on temzit_state structure)
+        # Modify mode (Режим) at offset 0 in settings array
+        # According to protocol: Режим is at offset 0
         # 0 = off, non-zero = on
         state_value = 1 if mode.lower() == "on" else 0
-        current_settings.set_short(0, state_value)
+        current_settings.set_byte(0, state_value)
         
         _LOGGER.info("Setting HVAC mode to %s (state=%d)", mode, state_value)
         
@@ -389,24 +397,53 @@ class temzit_settings:
     def __init__(self, data) -> None:
         # Store full response including command byte
         self.raw_data = data
-        # Settings data starts from byte 2 (skip command and length)
-        self.data = bytearray(data[2:]) if len(data) > 2 else bytearray(62)
+        # Settings data starts from byte 2 (skip command 0x02 and length/reserve)
+        # CONFIG_MAIN response: 0x02 | settings 30 bytes | reserve 31 bytes | CS 2 bytes
+        # We need only first 30 bytes of settings
+        if len(data) > 2:
+            # Extract settings array (30 bytes starting from offset 1, after command 0x02)
+            self.data = bytearray(data[1:31])  # bytes 1-30 (settings array)
+        else:
+            self.data = bytearray(30)  # Default: 30 zero bytes
 
     def convert(self, s: int, e: int) -> int:
+        """Convert bytes to integer (for reading from response)."""
         return int.from_bytes(self.data[s:e], byteorder="little", signed=True)
     
     def set_byte(self, offset: int, value: int) -> None:
-        """Set a single byte at offset."""
-        if 0 <= offset < len(self.data):
+        """Set a single byte at offset (0-29 for settings array)."""
+        if 0 <= offset < 30:
             self.data[offset] = value & 0xFF
+        else:
+            raise ValueError(f"Offset {offset} out of range (0-29)")
     
     def set_short(self, offset: int, value: int) -> None:
         """Set a 16-bit signed integer at offset (little-endian)."""
-        if 0 <= offset < len(self.data) - 1:
+        if 0 <= offset < 29:  # Need 2 bytes, so max offset is 29
             value_bytes = int.to_bytes(value, 2, byteorder="little", signed=True)
             self.data[offset:offset+2] = value_bytes
+        else:
+            raise ValueError(f"Offset {offset} out of range (0-28 for 16-bit value)")
     
     def to_bytes(self) -> bytes:
-        """Convert settings back to bytes for sending."""
-        # Protocol: command byte (0x35) + length (0x3E = 62) + data
-        return bytes([0x35, 0x3E]) + bytes(self.data)
+        """Convert settings to bytes for sending according to protocol.
+        
+        Protocol CFG 0x35: 
+        - Command: 0x35 (1 byte)
+        - Settings array: 30 bytes
+        - Checksum: 1 byte (sum of all bytes including 0x35, modulo 256)
+        Total: 32 bytes
+        """
+        # Build packet: 0x35 + 30 bytes of settings
+        packet = bytearray([0x35]) + self.data
+        
+        # Calculate checksum: sum of all bytes including 0x35, modulo 256
+        checksum = sum(packet) & 0xFF
+        
+        # Append checksum
+        packet.append(checksum)
+        
+        _LOGGER.debug("Sending CFG packet: cmd=0x%02X, settings_len=%d, checksum=0x%02X", 
+                    0x35, len(self.data), checksum)
+        
+        return bytes(packet)
