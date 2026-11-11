@@ -16,7 +16,7 @@ from homeassistant.const import Platform, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .entity import TemzitEntity
+from .entity import TemzitEntity, temzit_update
 from .coordinator import TemzitUpdateCoordinator
 from .const import DOMAIN
 
@@ -54,8 +54,12 @@ class HotWaterHeater(TemzitEntity, WaterHeaterEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_hot_water"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_target_temperature = self.coordinator.data.target_hotwater_temp
         self._attr_current_temperature = self.coordinator.data.hotwater_temp
         self._attr_current_operation = STATE_ELECTRIC if self.coordinator.data.boiler_heater_is_on else STATE_OFF
@@ -94,8 +98,12 @@ class MainHeater(TemzitEntity, WaterHeaterEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_main"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_target_temperature = self.coordinator.data.target_water_temp
         self._attr_current_temperature = self.coordinator.data.return_temp
         self._attr_current_operation = STATE_PERFORMANCE if self.coordinator.data.main_heater_is_on else STATE_HEAT_PUMP

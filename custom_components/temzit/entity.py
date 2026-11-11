@@ -1,11 +1,30 @@
 """TemzitEntity class."""
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import TypeVar
+
+from homeassistant.core import callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import ATTRIBUTION, DOMAIN, NAME, VERSION
 from .coordinator import TemzitUpdateCoordinator
+
+_T = TypeVar("_T", bound="TemzitEntity")
+
+
+def temzit_update(func: Callable[[_T], None]) -> Callable[[_T], None]:
+    """Skip coordinator updates while the heat pump is offline."""
+
+    @callback
+    def wrapper(self: _T) -> None:
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
+        func(self)
+
+    return wrapper
 
 
 class TemzitEntity(CoordinatorEntity):
@@ -23,3 +42,8 @@ class TemzitEntity(CoordinatorEntity):
             model="Temzit Heat Pump",
             manufacturer="Temzit",
         )
+
+    @property
+    def available(self) -> bool:
+        """Unavailable while the heat pump is not answering polls."""
+        return super().available and self.coordinator.data is not None

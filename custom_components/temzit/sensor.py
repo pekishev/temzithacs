@@ -9,7 +9,7 @@ from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN
 from .coordinator import TemzitUpdateCoordinator
-from .entity import TemzitEntity
+from .entity import TemzitEntity, temzit_update
 
 ENTITY_DESCRIPTIONS = (
     SensorEntityDescription(
@@ -58,8 +58,12 @@ class IndoorSensor(TemzitEntity, SensorEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_indoor_temp"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_native_value = self.coordinator.data.indoor_temp
         self.async_write_ha_state()
 
@@ -79,8 +83,12 @@ class OutdoorSensor(TemzitEntity, SensorEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_outdoor_temp"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_native_value = self.coordinator.data.outdoor_temp
         self.async_write_ha_state()
 
@@ -99,8 +107,12 @@ class HotWaterSensor(TemzitEntity, SensorEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_hotwater_temp"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_native_value = self.coordinator.data.hotwater_temp
         self.async_write_ha_state()
 
@@ -120,8 +132,12 @@ class SupplySensor(TemzitEntity, SensorEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_supply_temp"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_native_value = self.coordinator.data.supply_temp
         self.async_write_ha_state()
 
@@ -141,8 +157,12 @@ class ReturnSensor(TemzitEntity, SensorEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_return_temp"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_native_value = self.coordinator.data.return_temp
         self.async_write_ha_state()
 
@@ -160,8 +180,12 @@ class ConsumptionSensor(TemzitEntity, SensorEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_consumption"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_native_value = self.coordinator.data.consumption
         self.async_write_ha_state()
 
@@ -180,8 +204,12 @@ class HeatPowerSensor(TemzitEntity, SensorEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_heat_power"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_native_value = self.coordinator.data.heat_power
         self.async_write_ha_state()
 
@@ -199,8 +227,12 @@ class FlowSensor(TemzitEntity, SensorEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_flow"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_native_value = self.coordinator.data.flow
         self.async_write_ha_state()
 
@@ -226,8 +258,12 @@ class StateSensor(TemzitEntity, SensorEntity):
             registry.async_update_entity(entity_id, hidden_by=er.RegistryEntryHider.INTEGRATION)
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_native_value = self.coordinator.data.state
         self.async_write_ha_state()
 
@@ -253,8 +289,12 @@ class ScheduleSensor(TemzitEntity, SensorEntity):
             registry.async_update_entity(entity_id, hidden_by=er.RegistryEntryHider.INTEGRATION)
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_native_value = self.coordinator.data.schedule
         self.async_write_ha_state()
 
@@ -272,8 +312,12 @@ class ErrorSensor(TemzitEntity, SensorEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_error"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_native_value = self.coordinator.data.error
         self.async_write_ha_state()
 
@@ -293,8 +337,12 @@ class CompressorSensor(TemzitEntity, SensorEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_compressor1"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         self._attr_native_value = self.coordinator.data.compressor1
         self.async_write_ha_state()
 
@@ -313,8 +361,12 @@ class COPSensor(TemzitEntity, SensorEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_cop"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         cop_value = self.coordinator.data.cop
         self._attr_native_value = cop_value
         self.async_write_ha_state()

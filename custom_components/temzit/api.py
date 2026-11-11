@@ -47,22 +47,22 @@ class TemzitApiClient:
             _LOGGER.debug("Received %d bytes", len(data))
             
             if len(data) == 0:
-                _LOGGER.error("Empty response from device at %s:%s", self.ip, self.port)
+                _LOGGER.debug("Empty response from device at %s:%s", self.ip, self.port)
                 raise TemzitApiClientCommunicationError("Empty response from device")
             
             if len(data) < 2:
-                _LOGGER.error("Invalid response length: %d bytes (expected at least 2)", len(data))
+                _LOGGER.debug("Invalid response length: %d bytes (expected at least 2)", len(data))
                 raise TemzitApiClientCommunicationError("Invalid response length")
             
             _LOGGER.debug("Successfully fetched data from %s:%s", self.ip, self.port)
             return temzit_state(data)
         except (ConnectionError, OSError) as exception:
-            _LOGGER.error("Connection error to %s:%s: %s", self.ip, self.port, exception)
+            _LOGGER.debug("Connection error to %s:%s: %s", self.ip, self.port, exception)
             raise TemzitApiClientCommunicationError(
                 f"Error connecting to {self.ip}:{self.port}: {exception}"
             ) from exception
         except asyncio.TimeoutError as exception:
-            _LOGGER.error("Timeout connecting to %s:%s", self.ip, self.port)
+            _LOGGER.debug("Timeout connecting to %s:%s", self.ip, self.port)
             raise TemzitApiClientCommunicationError(
                 f"Timeout connecting to {self.ip}:{self.port}"
             ) from exception

@@ -7,7 +7,7 @@ from homeassistant.components.climate import ClimateEntity, HVACMode, ClimateEnt
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import callback
 
-from .entity import TemzitEntity
+from .entity import TemzitEntity, temzit_update
 from .coordinator import TemzitUpdateCoordinator
 
 from .const import DOMAIN
@@ -49,8 +49,12 @@ class TemzitClimate(TemzitEntity, ClimateEntity):
         self._attr_unique_id = coordinator.config_entry.entry_id + "_climate"
 
     @callback
+    @temzit_update
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        if self.coordinator.data is None:
+            self.async_write_ha_state()
+            return
         state = self.coordinator.data.state
         self._attr_current_temperature = self.coordinator.data.return_temp
         self._attr_target_temperature = self.coordinator.data.target_water_temp

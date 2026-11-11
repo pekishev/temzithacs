@@ -6,10 +6,7 @@ import asyncio
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import (
-    DataUpdateCoordinator,
-    UpdateFailed,
-)
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.exceptions import ConfigEntryAuthFailed
 
 from .api import (
@@ -53,4 +50,7 @@ class TemzitUpdateCoordinator(DataUpdateCoordinator):
         except TemzitApiClientAuthenticationError as exception:
             raise ConfigEntryAuthFailed(exception) from exception
         except TemzitApiClientError as exception:
-            raise UpdateFailed(exception) from exception
+            # Device is often powered off. Do not keep the last payload:
+            # entities become unavailable instead of showing stale readings.
+            LOGGER.debug("Temzit poll failed: %s", exception)
+            return None
