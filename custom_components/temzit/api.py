@@ -4,6 +4,8 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from .const import DEFAULT_FLOW_COEFFICIENT
+
 _LOGGER = logging.getLogger(__name__)
 
 class TemzitApiClientError(Exception):
@@ -24,9 +26,14 @@ class TemzitApiClientAuthenticationError(
 
 
 class TemzitApiClient:
-    def __init__(self, ip) -> None:
+    def __init__(
+        self,
+        ip,
+        flow_coefficient: float = DEFAULT_FLOW_COEFFICIENT,
+    ) -> None:
         self.ip = ip
         self.port = 333
+        self.flow_coefficient = flow_coefficient
 
     async def fetch_data(self) -> "temzit_state":
         """Fetch current state from the heat pump."""
@@ -55,7 +62,7 @@ class TemzitApiClient:
                 raise TemzitApiClientCommunicationError("Invalid response length")
             
             _LOGGER.debug("Successfully fetched data from %s:%s", self.ip, self.port)
-            return temzit_state(data)
+            return temzit_state(data, flow_coefficient=self.flow_coefficient)
         except (ConnectionError, OSError) as exception:
             _LOGGER.debug("Connection error to %s:%s: %s", self.ip, self.port, exception)
             raise TemzitApiClientCommunicationError(
@@ -306,8 +313,13 @@ class TemzitApiClient:
         await self._send_settings(current_settings)
 
 class temzit_state:
-    def __init__(self, data) -> None:
+    def __init__(
+        self,
+        data,
+        flow_coefficient: float = DEFAULT_FLOW_COEFFICIENT,
+    ) -> None:
         self.data = data[2:]
+        self.flow_coefficient = flow_coefficient
 
     @property
     def state(self) -> int:
@@ -398,14 +410,14 @@ class temzit_state:
         
         Java: Flow = getWord(bArr, 20) & 255
         Since we do data[2:], offset 20 in full packet = offset 18 in self.data
-        Java takes only low byte, so we need to extract byte 18 (not 16-bit word)
-        Then multiply by 4.2 (from C# implementation)
+        Java takes only low byte, so we need to extract byte 18 (not 16-bit word).
+        Scale with the configurable empirical coefficient (default 4.2).
         """
         # Java: Flow = getWord(bArr, 20) & 255 - takes only low byte
         # bArr[20] in full packet = data[18] after data[2:]
         if len(self.data) > 18:
             flow_raw = self.data[18] & 0xFF
-            return flow_raw * 4.2
+            return flow_raw * self.flow_coefficient
         return 0.0
 
     @property

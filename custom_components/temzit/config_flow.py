@@ -5,6 +5,7 @@ import ipaddress
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_IP_ADDRESS
+from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .api import (
@@ -13,13 +14,21 @@ from .api import (
     TemzitApiClientCommunicationError,
     TemzitApiClientError,
 )
-from .const import DOMAIN, LOGGER
+from .const import CONF_FLOW_COEFFICIENT, DEFAULT_FLOW_COEFFICIENT, DOMAIN, LOGGER
 
 
 class TemzitFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Temzit."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
+        """Return the options flow."""
+        return TemzitOptionsFlowHandler()
 
     async def async_step_user(
         self,
@@ -106,3 +115,44 @@ class TemzitFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         except Exception as e:
             LOGGER.error("Failed to connect to %s: %s", ip, e)
             raise
+
+
+class TemzitOptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle Temzit options."""
+
+    async def async_step_init(
+        self,
+        user_input: dict | None = None,
+    ) -> config_entries.FlowResult:
+        """Manage the Temzit options."""
+        if user_input is not None:
+            return self.async_create_entry(
+                title="",
+                data={
+                    CONF_FLOW_COEFFICIENT: float(user_input[CONF_FLOW_COEFFICIENT]),
+                },
+            )
+
+        current = float(
+            self.config_entry.options.get(
+                CONF_FLOW_COEFFICIENT, DEFAULT_FLOW_COEFFICIENT
+            )
+        )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_FLOW_COEFFICIENT,
+                        default=current,
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0.1,
+                            max=20.0,
+                            step=0.01,
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
+                }
+            ),
+        )

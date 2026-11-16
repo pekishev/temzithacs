@@ -19,5 +19,19 @@
             "cannot_connect": "Unable to connect to the device.",
             "invalid_host": "Invalid IP address or hostname."
         }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Temzit options",
+                "description": "Flow is the raw device byte multiplied by this coefficient so the reading can match the manufacturer's statistics.",
+                "data": {
+                    "flow_coefficient": "Flow coefficient"
+                },
+                "data_description": {
+                    "flow_coefficient": "Empirical scale for the flow sensor, l/min per raw unit. Default is 4.2."
+                }
+            }
+        }
     }
 }
