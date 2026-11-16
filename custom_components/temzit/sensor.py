@@ -310,6 +310,11 @@ class ErrorSensor(TemzitEntity, SensorEntity):
         """Pass coordinator to CoordinatorEntity."""
         super().__init__(coordinator)
         self._attr_unique_id = coordinator.config_entry.entry_id + "_error"
+        self._attr_extra_state_attributes = {
+            "codes": [],
+            "description": None,
+            "messages": [],
+        }
 
     @callback
     @temzit_update
@@ -318,7 +323,13 @@ class ErrorSensor(TemzitEntity, SensorEntity):
         if self.coordinator.data is None:
             self.async_write_ha_state()
             return
+        details = self.coordinator.data.error_details
         self._attr_native_value = self.coordinator.data.error
+        self._attr_extra_state_attributes = {
+            "codes": details["codes"],
+            "description": details["description"],
+            "messages": details["messages"],
+        }
         self.async_write_ha_state()
 
 

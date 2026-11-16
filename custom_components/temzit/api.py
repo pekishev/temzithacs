@@ -5,6 +5,7 @@ import asyncio
 import logging
 
 from .const import DEFAULT_FLOW_COEFFICIENT
+from .failures import decode_failures
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -427,9 +428,16 @@ class temzit_state:
         Java: Failures = getWord(bArr, 32)
         Since we do data[2:], offset 32 in full packet = offset 30 in self.data
         """
-        # Java: Failures = getWord(bArr, 32)
+        # Java: Failures = getWord(bArr, 32) stored as long; treat as unsigned bitmask.
         # bArr[32,33] in full packet = data[30,31] after data[2:]
-        return self.convert(30, 32)
+        if len(self.data) < 32:
+            return 0
+        return int.from_bytes(self.data[30:32], byteorder="little", signed=False)
+
+    @property
+    def error_details(self) -> dict:
+        """Decoded Failures bitmask from the WiFiControl app."""
+        return decode_failures(self.error)
 
     @property
     def compressor1(self) -> int:
