@@ -13,6 +13,9 @@ from .api import TemzitApiClient
 from .const import DOMAIN
 from .coordinator import TemzitUpdateCoordinator
 
+# Load platforms with this module (import executor), not later in the event loop.
+from . import climate, sensor, water_heater  # noqa: F401
+
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
     Platform.CLIMATE,
