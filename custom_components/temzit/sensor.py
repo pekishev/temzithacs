@@ -304,13 +304,13 @@ class ErrorSensor(TemzitEntity, SensorEntity):
 
     _attr_name = "Ошибка"
     _attr_icon = "mdi:alert-circle"
-    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator):
         """Pass coordinator to CoordinatorEntity."""
         super().__init__(coordinator)
         self._attr_unique_id = coordinator.config_entry.entry_id + "_error"
         self._attr_extra_state_attributes = {
+            "raw_code": None,
             "codes": [],
             "description": None,
             "messages": [],
@@ -324,8 +324,12 @@ class ErrorSensor(TemzitEntity, SensorEntity):
             self.async_write_ha_state()
             return
         details = self.coordinator.data.error_details
-        self._attr_native_value = self.coordinator.data.error
+        description = details["description"]
+        self._attr_native_value = (
+            description if len(description) <= 255 else ", ".join(details["codes"])
+        )
         self._attr_extra_state_attributes = {
+            "raw_code": self.coordinator.data.error,
             "codes": details["codes"],
             "description": details["description"],
             "messages": details["messages"],
